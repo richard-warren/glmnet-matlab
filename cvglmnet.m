@@ -290,12 +290,6 @@ end
 cpredmat = cell(nfolds,1);
 
 if (parallel == true)
-    offpar = 0;
-    if matlabpool('size') <= 0
-        offpar = 1;
-        matlabpool;
-    end
-    
     parfor i = 1: nfolds
         which = foldid==i;
         opts = options;
@@ -307,10 +301,6 @@ if (parallel == true)
         xr = x(~which,:); yr = y(~which,:);
         cpredmat{i} = glmnet(xr, yr, family, opts);
     end
-    
-    if (offpar)
-        matlabpool close;
-    end    
 else   
     for i = 1: nfolds        
         which = foldid==i;
@@ -348,14 +338,22 @@ CVerr.lambda = options.lambda;
 CVerr.cvm = transpose(cvm); CVerr.cvsd = transpose(cvsd); 
 CVerr.cvup = transpose(cvm+cvsd); CVerr.cvlo = transpose(cvm-cvsd); CVerr.nzero = nz;
 CVerr.name = cvname; CVerr.glmnet_fit = glmfit;
+
+% hang on to models
 if (keep)
-    CVerr.fit_preval = cvstuff.fit_preval; CVerr.foldid = foldid;
+    CVerr.models = cpredmat;  % models trainined on each fold
+%     CVerr.X = x;
+%     CVerr.y = y;
+    CVerr.fit_preval = cvstuff.fit_preval;
+    CVerr.foldid = uint8(foldid);
 end
+
 if strcmp(type, 'auc')
     cvm = -cvm;
 end
 CVerr.lambda_min = max(options.lambda(cvm<=min(cvm)));
 idmin = options.lambda==CVerr.lambda_min;
+CVerr.lambda_min_id = find(idmin);  % index of min lambda
 semin = cvm(idmin)+cvsd(idmin);
 CVerr.lambda_1se = max(options.lambda(cvm<=semin));
 CVerr.class = 'cv.glmnet';

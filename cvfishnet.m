@@ -76,3 +76,6 @@ deveta = yy .* eta - exp(eta);
 devy = yy .* log(yy) - yy;
 devy(yy == 0) = 0;
 result = 2 * (devy - deveta);
+
+
+

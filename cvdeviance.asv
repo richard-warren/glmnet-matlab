@@ -1,0 +1,56 @@
+function deviance = cvdeviance(X, y, fit, varargin)
+% compute fraction of null deviance explained for held-out data
+% fit object is returned by cvglmnet // note that you must set keep=true 
+% for cvglmnet // otherwise the data needed for this analysis will not be 
+% saved in fit // optional timeBins argument restricts deviance computation
+% to times defined by timeBins
+
+% todo: column swapping // row bins
+
+% settings
+s.holdout = true;                 % whether to evaluate predictions only on held-out data
+s.bestLambdaOnly = true;          % whether to only return deviances for the best lambda
+s.timeBins = true(size(X,1),1);   % only use rows of X where timeBins==1 // use to restrict analysis to certain times
+
+% inits
+if exist('varargin', 'var'); for i = 1:2:length(varargin); s.(varargin{i}) = varargin{i+1}; end; end  % parse name-value pairs
+nlambda = length(fit.lambda);
+
+% generate predictions
+if s.holdout
+    yhat = NaN(length(y), length(fit.lambda));
+    nfolds = max(fit.foldid);
+    for i = 1:nfolds
+        which = fit.foldid == i;
+        fitobj = fit.models{i};
+        yhat(which,:) = glmnetPredict(fitobj, X(which,:),[],'response');
+    end
+else
+    yhat = glmnetPredict(fit.glmnet_fit, X, [], 'response');
+end
+
+% restrict times
+null = mean(y);  % compute null mean BEFORE retricting times (because the rest of the model was trained on the full data as well)
+y = y(s.timeBins);
+yhat = yhat(s.timeBins,:);
+keyboard
+% if s.bestLambdaOnly; yhat = yhat(; end
+
+% full model deviance
+y = repmat(y, 1, nlambda);
+t1 = y .* (log(y) - log(yhat));
+t1(y==0) = 0;
+t2 = y - yhat;
+devFull = 2*sum(t1-t2)';
+
+% null model deviance
+t1 = y .* (log(y) - log(null));
+t1(y==0) = 0;
+t2 = y - null;
+devNull = 2*sum(t1-t2)';
+
+% deviance
+deviance = 1 - devFull ./ devNull;
+if s.bestLambdaOnly; deviance = deviance(fit.lambda_min_id); end
+
+
